@@ -1,0 +1,208 @@
+import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
+
+void main() {
+  runApp(const PlannerApp());
+}
+
+class PlannerApp extends StatelessWidget {
+  const PlannerApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: '수행평가 긴급 플래너',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      home: const PlannerHomeScreen(),
+    );
+  }
+}
+
+class PlannerHomeScreen extends StatefulWidget {
+  const PlannerHomeScreen({super.key});
+
+  @override
+  State<PlannerHomeScreen> createState() => _PlannerHomeScreenState();
+}
+
+class _PlannerHomeScreenState extends State<PlannerHomeScreen> {
+  // 초기 과제 목록 (dDay 숫자에 따라 긴급도가 결정됩니다)
+  final List> _tasks = [
+    {'title': '프로그래밍 수행평가 웹앱 만들기', 'dDay': 3, 'status': '진행 중'},
+    {'title': '사회문제탐구 보고서 작성', 'dDay': 10, 'status': '준비 전'},
+    {'title': '영어 영작문 과제', 'dDay': 1, 'status': '급함'},
+  ];
+
+  // 남은 일수에 따라 색상, 경고 멘트 반환
+  Map<String, dynamic> _getUrgencyStyle(int dDay) {
+    if (dDay <= 3) {
+      return {
+        'color': Colors.red.shade100,
+        'borderColor': Colors.red,
+        'textColor': Colors.red.shade900,
+        'message': '🚨 어서 해라! 불타는 중!',
+      };
+    } else if (dDay <= 7) {
+      return {
+        'color': Colors.amber.shade100,
+        'borderColor': Colors.amber,
+        'textColor': Colors.amber.shade900,
+        'message': '⚠️ 신경써라! 곧 닥친다!',
+      };
+    } else {
+      return {
+        'color': Colors.green.shade100,
+        'borderColor': Colors.green,
+        'textColor': Colors.green.shade900,
+        'message': '🌿 여유가 있다~ 널널함',
+      };
+    }
+  }
+
+  // 홈 위젯으로 가장 급한 과제 데이터 전송하는 함수
+  void _syncToWidget(String title, String message) async {
+    await HomeWidget.saveWidgetData<String>('widget_title', title);
+    await HomeWidget.saveWidgetData<String>('widget_message', message);
+    await HomeWidget.updateWidget(
+      name: 'PlannerWidgetProvider',
+      androidName: 'PlannerWidgetProvider',
+    );
+  }
+
+  // 과제 추가 다이얼로그
+  void _showAddTaskDialog() {
+    final titleController = TextEditingController();
+    final dDayController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('새 과제 추가'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: '과제 이름'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: dDayController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '남은 일수 (숫자만 입력, 예: 5)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (titleController.text.isNotEmpty && dDayController.text.isNotEmpty) {
+                  setState(() {
+                    int dDay = int.tryParse(dDayController.text) ?? 5;
+                    _tasks.add({
+                      'title': titleController.text,
+                      'dDay': dDay,
+                      'status': '진행 중',
+                    });
+                    
+                    var style = _getUrgencyStyle(dDay);
+                    _syncToWidget(titleController.text, style['message']);
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('추가'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('수행평가 긴급 플래너'),
+        backgroundColor: Colors.blue.shade100,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '📌 D-Day 실시간 경고 보드',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _tasks.length,
+                itemBuilder: (context, index) {
+                  final task = _tasks[index];
+                  int dDay = task['dDay'];
+                  var style = _getUrgencyStyle(dDay);
+
+                  return Card(
+                    elevation: 4,
+                    color: style['color'],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: style['borderColor'], width: 2),
+                    ),
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.between,
+                            children: [
+                              Text(
+                                'D-$dDay',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: style['textColor'],
+                                ),
+                              ),
+                              Chip(
+                                label: Text(style['message'], style: TextStyle(color: style['textColor'], fontWeight: FontWeight.bold)),
+                                backgroundColor: Colors.white.withOpacity(0.7),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            task['title'],
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddTaskDialog,
+        backgroundColor: Colors.blue.shade300,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
